@@ -1,0 +1,14 @@
+[
+  {
+    "url": "https://github.com/frappe/erpnext",
+    "branch": "v16.52.1"
+  },
+  {
+    "url": "https://github.com/inomotech-foss/hrms",
+    "branch": "pegasus-v16"
+  },
+  {
+    "url": "https://github.com/libracore/erpnextswiss",
+    "branch": "v16"
+  }
+]

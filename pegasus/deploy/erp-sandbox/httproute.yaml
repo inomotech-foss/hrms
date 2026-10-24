@@ -1,0 +1,18 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: erp-sandbox
+spec:
+  parentRefs:
+    - name: pegasus-a
+      namespace: inomo-envoy-gateway
+      sectionName: https-apps
+    - name: pegasus-b
+      namespace: inomo-envoy-gateway
+      sectionName: https-apps
+  hostnames:
+    - erp-sandbox.apps.svc.inomo.tech
+  rules:
+    - backendRefs:
+        - name: frappe
+          port: 80

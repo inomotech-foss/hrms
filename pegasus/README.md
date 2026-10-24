@@ -1,0 +1,104 @@
+# Frappe HR on Pegasus
+
+INOMO runs Frappe HR and ERPNext on [Pegasus](https://codeberg.org/inomotech/pegasus-cluster) from
+this branch (`pegasus-v16`). Everything is public: the HRMS fixes, this folder and the image
+`ghcr.io/inomotech-foss/hrms`.
+
+The image contains Frappe, ERPNext, HRMS from this branch and
+[ERPNextSwiss](https://github.com/libracore/erpnextswiss). The versions are pinned in `apps.json`
+and `Containerfile`. `.github/workflows/pegasus.yaml` builds it on every push to this branch.
+
+| App | URL | Purpose |
+|---|---|---|
+| `erp-sandbox` | https://erp-sandbox.apps.svc.inomo.tech | Test data. Follows `pegasus-v16`. Safe to wipe. |
+| `hr` | https://hr.apps.svc.inomo.tech | Not set up yet. Real HR data once the sandbox has passed. |
+
+Pegasus' Argo CD only reads `github.com/inomotech/*` today. Registering the app below needs
+`https://github.com/inomotech-foss/*` added to `sourceRepos` in pegasus-cluster.
+
+## How it runs
+
+Each app is one pod, because every Frappe process needs the `sites` volume and Pegasus
+volumes are ReadWriteOnce:
+
+- `redis-cache` and `redis-queue`: sidecars, no persistence
+- `init`: `resources/pegasus-init.sh`. Writes the config from the secrets, creates the site
+  on the first start, installs missing apps and runs `bench migrate`. Runs before every start.
+- `frontend` (nginx, port 8080), `backend` (gunicorn), `websocket`, `worker`, `scheduler`
+
+The database is a Pegasus `PostgresDatabase` (Postgres 18). Frappe calls Postgres support
+experimental, and HRMS is not tested on it. Testing that is the sandbox's job.
+
+Differences from the stock frappe_docker image:
+
+- The `frappe` user is UID 10001, as Pegasus requires.
+- The Postgres client is 18. `pg_dump` 17 cannot back up a Postgres 18 server.
+- nginx drops the `Authorization` header. The gateway sets it to the Entra token, and Frappe
+  rejects every request with a bearer token it does not know.
+- `resources/postgres-compat.sql` adds `ifnull()`, which ERPNextSwiss uses in raw SQL.
+- `resources/sitecustomize.py` makes psycopg2 return JSON columns as strings, as MariaDB
+  does. Without it, Frappe fails on `DocField.link_filters` when a customization of
+  Customer is saved, which breaks the ERPNextSwiss install.
+
+This branch is HRMS tag `v16.52.0` plus Postgres fixes plus this folder. To update, rebase it
+onto the next HRMS tag, and offer the fixes upstream.
+
+## Postgres status
+
+Tested locally against Postgres 18 with a non-superuser database owner, like on Pegasus:
+site creation, install of all four apps, restart (migrate only), login, API, socket.io and
+`bench backup`. Payroll and ERPNextSwiss features are not tested yet.
+
+## First deploy of an app
+
+1. Create the secrets in OpenBao. The encryption key must never change, or encrypted fields
+   (passwords, API keys) can no longer be read.
+
+   ```sh
+   export BAO_ADDR=https://openbao.management.orion.inomo.tech
+   bao login -method=oidc
+   bao kv put -namespace=pegasus kv/apps/app-erp-sandbox/app \
+     admin_password="$(openssl rand -base64 24)" \
+     encryption_key="$(openssl rand -base64 32 | tr '+/' '-_')"
+   ```
+
+2. Wait until CI has built an image and set its tag in `pegasus/deploy/erp-sandbox/kustomization.yaml`.
+
+3. Register the app:
+
+   ```sh
+   argocd login argocd.svc.inomo.tech --sso --grpc-web
+   argocd app create erp-sandbox \
+     --project apps \
+     --repo https://github.com/inomotech-foss/hrms \
+     --revision pegasus-v16 \
+     --path pegasus/deploy/erp-sandbox \
+     --dest-server https://kubernetes.default.svc \
+     --dest-namespace app-erp-sandbox \
+     --sync-policy automated --auto-prune --self-heal \
+     --sync-option CreateNamespace=true
+   argocd app logs erp-sandbox --kind Deployment --name frappe --container init --follow
+   ```
+
+   The first start installs all apps and takes 10 to 20 minutes.
+
+4. Sign in as `Administrator` with the admin password from OpenBao (read it with
+   `bao kv get -namespace=pegasus -field=admin_password kv/apps/app-erp-sandbox/app`), run the
+   setup wizard and create personal accounts.
+
+## Operating
+
+```sh
+argocd app get erp-sandbox
+argocd app logs erp-sandbox --kind Deployment --name frappe --container backend --tail 100
+argocd app actions run erp-sandbox restart --kind Deployment --resource-name frappe
+```
+
+For `bench` commands, open a terminal on the `backend` container in the Argo CD web UI.
+
+## Updating
+
+Rebase onto the new HRMS tag, change the tags in `apps.json` (and `FRAPPE_BRANCH` in `Containerfile`)
+and push. CI builds the
+image and deploys it to `erp-sandbox`, and the init container runs `bench migrate`. `hr` gets the
+tag by hand once the sandbox has run it.

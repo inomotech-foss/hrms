@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+  - httproute.yaml
+  - secretproviderclass.yaml
+configMapGenerator:
+  - name: frappe
+    literals:
+      - SITE_NAME=erp-sandbox.apps.svc.inomo.tech
+      - FRAPPE_SITE_NAME_HEADER=erp-sandbox.apps.svc.inomo.tech
+      - INSTALL_APPS=erpnext hrms erpnextswiss
+images:
+  - name: ghcr.io/inomotech-foss/hrms
+    newTag: unbuilt

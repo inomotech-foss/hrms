@@ -1,0 +1,258 @@
+# One pod runs the whole bench, because every Frappe process needs the sites
+# volume and Pegasus volumes are ReadWriteOnce.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frappe
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  # The first start installs every app, which takes a while.
+  progressDeadlineSeconds: 3600
+  selector:
+    matchLabels:
+      app: frappe
+  template:
+    metadata:
+      labels:
+        app: frappe
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Native sidecars: they start before init and keep running.
+        - name: redis-cache
+          image: docker.io/library/redis:8.2.2-alpine
+          restartPolicy: Always
+          args: ["--port", "6379", "--save", "", "--appendonly", "no", "--maxmemory", "192mb", "--maxmemory-policy", "allkeys-lru"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: redis-cache
+              mountPath: /data
+        - name: redis-queue
+          image: docker.io/library/redis:8.2.2-alpine
+          restartPolicy: Always
+          args: ["--port", "6380", "--save", "", "--appendonly", "no"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: redis-queue
+              mountPath: /data
+        - name: init
+          image: ghcr.io/inomotech-foss/hrms
+          args: ["pegasus-init.sh"]
+          envFrom:
+            - configMapRef:
+                name: frappe
+          env:
+            - name: PGSSLMODE
+              value: require
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 3Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+            - name: logs
+              mountPath: /home/frappe/frappe-bench/logs
+            - name: tmp
+              mountPath: /tmp
+            - name: db
+              mountPath: /mnt/db
+              readOnly: true
+            - name: secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+      containers:
+        - name: frontend
+          image: ghcr.io/inomotech-foss/hrms
+          command: ["nginx-entrypoint.sh"]
+          envFrom:
+            - configMapRef:
+                name: frappe
+          env:
+            - name: BACKEND
+              value: 127.0.0.1:8000
+            - name: SOCKETIO
+              value: 127.0.0.1:9000
+            - name: NGINX_LISTEN_PORT
+              value: "8080"
+            - name: CLIENT_MAX_BODY_SIZE
+              value: 50m
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /api/method/ping
+              port: 8080
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+            - name: tmp
+              mountPath: /tmp
+        - name: backend
+          image: ghcr.io/inomotech-foss/hrms
+          command: ["start.sh"]
+          envFrom:
+            - configMapRef:
+                name: frappe
+          env:
+            - name: PGSSLMODE
+              value: require
+            # Each Pegasus database allows 20 connections.
+            - name: GUNICORN_WORKERS
+              value: "2"
+            - name: GUNICORN_THREADS
+              value: "4"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+            - name: logs
+              mountPath: /home/frappe/frappe-bench/logs
+            - name: tmp
+              mountPath: /tmp
+        - name: websocket
+          image: ghcr.io/inomotech-foss/hrms
+          command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+            - name: tmp
+              mountPath: /tmp
+        - name: worker
+          image: ghcr.io/inomotech-foss/hrms
+          command: ["bench", "worker", "--queue", "short,default,long"]
+          envFrom:
+            - configMapRef:
+                name: frappe
+          env:
+            - name: PGSSLMODE
+              value: require
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+            - name: logs
+              mountPath: /home/frappe/frappe-bench/logs
+            - name: tmp
+              mountPath: /tmp
+        - name: scheduler
+          image: ghcr.io/inomotech-foss/hrms
+          command: ["bench", "schedule"]
+          envFrom:
+            - configMapRef:
+                name: frappe
+          env:
+            - name: PGSSLMODE
+              value: require
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+            - name: logs
+              mountPath: /home/frappe/frappe-bench/logs
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: sites
+          persistentVolumeClaim:
+            claimName: sites
+        - name: logs
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: redis-cache
+          emptyDir: {}
+        - name: redis-queue
+          emptyDir: {}
+        - name: db
+          secret:
+            secretName: main-postgres
+        - name: secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: frappe

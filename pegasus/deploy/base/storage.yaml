@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sites
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+# The platform creates the database and the Secret main-postgres.
+apiVersion: xr.inomo.tech/v1alpha1
+kind: PostgresDatabase
+metadata:
+  name: main
+spec: {}

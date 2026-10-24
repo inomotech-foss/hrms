@@ -1,0 +1,79 @@
+# syntax=docker/dockerfile:1
+
+# Frappe bench with ERPNext, HRMS and ERPNextSwiss for Pegasus.
+# Based on frappe_docker's layered image, with these changes for Pegasus:
+# the frappe user is UID 10001, the Postgres client matches the Postgres 18
+# server, nginx drops the gateway's Authorization header, and Postgres JSON
+# columns come back as strings (resources/sitecustomize.py).
+
+ARG FRAPPE_IMAGE_TAG=v16.52.0
+
+FROM frappe/build:${FRAPPE_IMAGE_TAG} AS builder
+
+ARG FRAPPE_BRANCH=v16.53.0
+
+USER frappe
+
+COPY --chown=frappe:0 apps.json /opt/frappe/apps.json
+
+RUN bench init \
+    --apps_path=/opt/frappe/apps.json \
+    --frappe-branch=${FRAPPE_BRANCH} \
+    --frappe-path=https://github.com/frappe/frappe \
+    --no-procfile \
+    --no-backups \
+    --skip-redis-config-generation \
+    /home/frappe/frappe-bench && \
+  cd /home/frappe/frappe-bench && \
+  echo "{}" > sites/common_site_config.json && \
+  find apps -mindepth 1 -path "*/.git" | xargs rm -fr && \
+  chmod -R g=u /home/frappe/frappe-bench
+
+FROM frappe/base:${FRAPPE_IMAGE_TAG}
+
+USER root
+
+# pg_dump refuses to dump a newer server, and Debian's client is 17.
+# libgl1 and libglib2.0 are runtime libraries for opencv (ERPNextSwiss).
+RUN install -d /usr/share/postgresql-common/pgdg && \
+  curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    https://www.postgresql.org/media/keys/ACCC4CF8.asc && \
+  . /etc/os-release && \
+  echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+    > /etc/apt/sources.list.d/pgdg.list && \
+  apt-get update && \
+  apt-get install --no-install-recommends -y postgresql-client-18 libgl1 libglib2.0-0t64 && \
+  apt-get purge -y 'postgresql-client-1[0-7]' && \
+  rm -rf /var/lib/apt/lists/* && \
+  pg_dump --version | grep -q ' 18\.'
+
+# Pegasus pods run as UID 10001. The group stays 0, as in frappe_docker.
+RUN usermod -u 10001 frappe
+
+# The gateway sends "Authorization: Bearer <Entra token>". Frappe treats any
+# Authorization header as an API login and rejects the request, so drop it.
+RUN sed -i '/proxy_set_header X-Frappe-Site-Name/a\		proxy_set_header Authorization "";' \
+    /templates/nginx/frappe.conf.template && \
+  test "$(grep -c 'proxy_set_header Authorization ""' /templates/nginx/frappe.conf.template)" -eq 2
+
+COPY --from=builder --chown=10001:0 /home/frappe/frappe-bench /home/frappe/frappe-bench
+
+WORKDIR /home/frappe/frappe-bench
+
+# Assets live in the image, the entrypoint links them into the sites volume.
+RUN chmod g=u /home/frappe/frappe-bench && \
+  cp -r sites/assets assets && \
+  rm -rf sites/assets
+
+COPY --chmod=755 resources/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY --chmod=755 resources/start.sh /usr/local/bin/start.sh
+COPY --chmod=755 resources/pegasus-init.sh /usr/local/bin/pegasus-init.sh
+COPY resources/postgres-compat.sql /opt/pegasus/postgres-compat.sql
+COPY resources/sitecustomize.py /opt/pegasus/sitecustomize.py
+RUN cp /opt/pegasus/sitecustomize.py \
+    "$(env/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')/sitecustomize.py"
+
+USER 10001
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["start.sh"]
