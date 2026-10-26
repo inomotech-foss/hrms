@@ -1,10 +1,8 @@
 #!/bin/bash
-# Runs as the init container before every start: writes the bench config from
-# the mounted secrets, creates the site on the first start, installs missing
-# apps and migrates.
+# Runs as the init container before every start: writes the bench config,
+# creates the site on the first start, installs missing apps and migrates.
 #
-# /mnt/db      Secret main-postgres from the PostgresDatabase
-# /mnt/secrets OpenBao: admin-password, encryption-key
+# /mnt/db  Secret main-postgres from the PostgresDatabase
 set -euo pipefail
 
 : "${SITE_NAME:?}"
@@ -41,14 +39,21 @@ if [ ! -f "sites/$SITE_NAME/site_config.json" ]; then
     --db-name "$db_name" \
     --db-user "$db_user" \
     --db-password "$db_password" \
-    --admin-password "$(cat /mnt/secrets/admin-password)" \
+    --admin-password "$(env/bin/python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
     --set-default
 fi
 
-# Applying the PostgresDatabase again issues a new password, and the key must
-# never drift from OpenBao, so both are written on every start.
+# Applying the PostgresDatabase again issues a new password.
 bench --site "$SITE_NAME" set-config db_password "$db_password"
-bench --site "$SITE_NAME" set-config encryption_key "$(cat /mnt/secrets/encryption-key)"
+
+# Encrypts stored passwords and API keys. It lives only in site_config.json on
+# the sites volume and must never change. Created here once, so that no two
+# processes race to create it on first use.
+if ! jq -e .encryption_key "sites/$SITE_NAME/site_config.json" >/dev/null; then
+  bench --site "$SITE_NAME" set-config encryption_key \
+    "$(env/bin/python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+fi
+
 bench --site "$SITE_NAME" set-config host_name "https://$SITE_NAME"
 bench --site "$SITE_NAME" set-config --parse pegasus_auth "${PEGASUS_AUTH:-"{}"}"
 

@@ -92,9 +92,6 @@ spec:
             - name: db
               mountPath: /mnt/db
               readOnly: true
-            - name: secrets
-              mountPath: /mnt/secrets
-              readOnly: true
       containers:
         - name: frontend
           image: ghcr.io/inomotech-foss/hrms
@@ -250,9 +247,3 @@ spec:
         - name: db
           secret:
             secretName: main-postgres
-        - name: secrets
-          csi:
-            driver: secrets-store.csi.k8s.io
-            readOnly: true
-            volumeAttributes:
-              secretProviderClass: frappe

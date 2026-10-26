@@ -22,7 +22,7 @@ Each app is one pod, because every Frappe process needs the `sites` volume and P
 volumes are ReadWriteOnce:
 
 - `redis-cache` and `redis-queue`: sidecars, no persistence
-- `init`: `resources/pegasus-init.sh`. Writes the config from the secrets, creates the site
+- `init`: `resources/pegasus-init.sh`. Writes the config, creates the site
   on the first start, installs missing apps and runs `bench migrate`. Runs before every start.
 - `frontend` (nginx, port 8080), `backend` (gunicorn), `websocket`, `worker`, `scheduler`
 
@@ -68,20 +68,15 @@ site creation, install of all four apps, restart (migrate only), login, API, soc
 
 ## First deploy of an app
 
-1. Create the secrets in OpenBao. The encryption key must never change, or encrypted fields
-   (passwords, API keys) can no longer be read.
+There are no secrets to create. The database login comes from the `PostgresDatabase`, and
+Frappe's encryption key is created on the first start and kept in `site_config.json` on the
+`sites` volume. It must never change, or stored passwords and API keys can no longer be read,
+so keep the volume (it is backed up daily, and `bench backup` saves the site config too).
+The `Administrator` password is random and never used; sign-in is SSO.
 
-   ```sh
-   export BAO_ADDR=https://openbao.management.orion.inomo.tech
-   bao login -method=oidc
-   bao kv put -namespace=pegasus kv/apps/app-erp-sandbox/app \
-     admin_password="$(openssl rand -base64 24)" \
-     encryption_key="$(openssl rand -base64 32 | tr '+/' '-_')"
-   ```
+1. Wait until CI has built an image and set its tag in `pegasus/deploy/erp-sandbox/kustomization.yaml`.
 
-2. Wait until CI has built an image and set its tag in `pegasus/deploy/erp-sandbox/kustomization.yaml`.
-
-3. Register the app:
+2. Register the app:
 
    ```sh
    argocd login argocd.svc.inomo.tech --sso --grpc-web
@@ -99,7 +94,7 @@ site creation, install of all four apps, restart (migrate only), login, API, soc
 
    The first start installs all apps and takes 10 to 20 minutes.
 
-4. Open the app. You are signed in with your Entra account (see "Login"). An HR manager runs
+3. Open the app. You are signed in with your Entra account (see "Login"). An HR manager runs
    the setup wizard.
 
 ## Operating

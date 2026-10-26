@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
 - ../base
 - httproute.yaml
-- secretproviderclass.yaml
 configMapGenerator:
 - files:
   - PEGASUS_AUTH=pegasus-auth.json
