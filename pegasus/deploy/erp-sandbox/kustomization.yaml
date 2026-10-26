@@ -5,14 +5,14 @@ resources:
 - httproute.yaml
 - secretproviderclass.yaml
 configMapGenerator:
-- literals:
+- files:
+  - PEGASUS_AUTH=pegasus-auth.json
+  literals:
   - SITE_NAME=erp-sandbox.apps.svc.inomo.tech
   - FRAPPE_SITE_NAME_HEADER=erp-sandbox.apps.svc.inomo.tech
   - INSTALL_APPS=erpnext hrms erpnextswiss pegasus_auth
-  files:
-  - PEGASUS_AUTH=pegasus-auth.json
   name: frappe
 images:
 - name: ghcr.io/inomotech-foss/hrms
   newName: ghcr.io/inomotech-foss/hrms
-  newTag: 02516f751149d53255865674d9fea1a06d007125
+  newTag: 321065e67bd818d2587f6ede749ebe75849ae02b
