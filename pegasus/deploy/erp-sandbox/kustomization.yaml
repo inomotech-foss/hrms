@@ -14,4 +14,4 @@ configMapGenerator:
 images:
 - name: ghcr.io/inomotech-foss/hrms
   newName: ghcr.io/inomotech-foss/hrms
-  newTag: 6c3afe4eda65b07041237bb78e8c8634d4e1f528
+  newTag: a264cbf247efaa791ce97cdc8e03d3616a50a65a
