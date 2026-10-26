@@ -1,0 +1,10 @@
+[
+  {
+    "url": "https://github.com/frappe/erpnext",
+    "branch": "develop"
+  },
+  {
+    "url": "https://github.com/inomotech-foss/hrms",
+    "branch": "pegasus-develop"
+  }
+]

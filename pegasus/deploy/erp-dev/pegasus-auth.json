@@ -1,0 +1,6 @@
+{
+  "roles": {
+    "f09913cf-fcf7-4e25-9dc7-25157a5e4d50": ["System Manager", "HR Manager", "HR User"],
+    "80193461-cd61-4081-9101-75ecd2a3f0ed": ["System Manager", "HR Manager", "HR User"]
+  }
+}

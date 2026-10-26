@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../base
+- httproute.yaml
+configMapGenerator:
+- files:
+  - PEGASUS_AUTH=pegasus-auth.json
+  literals:
+  - SITE_NAME=erp-dev.apps.svc.inomo.tech
+  - FRAPPE_SITE_NAME_HEADER=erp-dev.apps.svc.inomo.tech
+  - INSTALL_APPS=erpnext hrms pegasus_auth
+  name: frappe
+images:
+- name: ghcr.io/inomotech-foss/hrms
+  newName: ghcr.io/inomotech-foss/hrms
+  newTag: unbuilt
