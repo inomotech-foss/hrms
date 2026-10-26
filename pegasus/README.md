@@ -43,6 +43,23 @@ Differences from the stock frappe_docker image:
 This branch is HRMS tag `v16.52.0` plus Postgres fixes plus this folder. To update, rebase it
 onto the next HRMS tag, and offer the fixes upstream.
 
+## Login
+
+There is no Frappe login. The Pegasus gateway signs everyone in with Entra, and
+`apps/pegasus_auth` signs the same user into Frappe from the gateway's `X-Auth-Request-*`
+headers:
+
+- Unknown users are created on their first visit as Employee Self Service users. They get that
+  role once HR links them to their Employee (field `User ID`).
+- `deploy/<app>/pegasus-auth.json` lists Entra object IDs with extra roles. These users become
+  System Users with those roles. Roles are only added, never removed. Currently Nils Armbruster
+  and Frank Wagner get System Manager, HR Manager and HR User.
+- Disabled users are not signed in.
+- Logging out of Frappe redirects to `/oauth2/logout`, which signs out of Entra and all Pegasus
+  apps. Otherwise the headers would sign the user straight back in.
+- Requests without the headers (health checks) are not signed in. `Administrator` is only
+  needed from `bench`.
+
 ## Postgres status
 
 Tested locally against Postgres 18 with a non-superuser database owner, like on Pegasus:
@@ -82,9 +99,8 @@ site creation, install of all four apps, restart (migrate only), login, API, soc
 
    The first start installs all apps and takes 10 to 20 minutes.
 
-4. Sign in as `Administrator` with the admin password from OpenBao (read it with
-   `bao kv get -namespace=pegasus -field=admin_password kv/apps/app-erp-sandbox/app`), run the
-   setup wizard and create personal accounts.
+4. Open the app. You are signed in with your Entra account (see "Login"). An HR manager runs
+   the setup wizard.
 
 ## Operating
 

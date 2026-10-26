@@ -50,6 +50,7 @@ fi
 bench --site "$SITE_NAME" set-config db_password "$db_password"
 bench --site "$SITE_NAME" set-config encryption_key "$(cat /mnt/secrets/encryption-key)"
 bench --site "$SITE_NAME" set-config host_name "https://$SITE_NAME"
+bench --site "$SITE_NAME" set-config --parse pegasus_auth "${PEGASUS_AUTH:-"{}"}"
 
 installed=$(bench --site "$SITE_NAME" list-apps --format json | jq -r --arg site "$SITE_NAME" '.[$site][]')
 for app in $INSTALL_APPS; do

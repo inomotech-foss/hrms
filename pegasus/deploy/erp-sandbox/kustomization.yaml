@@ -8,7 +8,9 @@ configMapGenerator:
 - literals:
   - SITE_NAME=erp-sandbox.apps.svc.inomo.tech
   - FRAPPE_SITE_NAME_HEADER=erp-sandbox.apps.svc.inomo.tech
-  - INSTALL_APPS=erpnext hrms erpnextswiss
+  - INSTALL_APPS=erpnext hrms erpnextswiss pegasus_auth
+  files:
+  - PEGASUS_AUTH=pegasus-auth.json
   name: frappe
 images:
 - name: ghcr.io/inomotech-foss/hrms
