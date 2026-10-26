@@ -62,9 +62,19 @@ headers:
 
 ## Postgres status
 
-Tested locally against Postgres 18 with a non-superuser database owner, like on Pegasus:
-site creation, install of all four apps, restart (migrate only), login, API, socket.io and
-`bench backup`. Payroll and ERPNextSwiss features are not tested yet.
+ERPNext 16 still has MariaDB-only code; Frappe calls Postgres support experimental, and
+HRMS is not tested on it upstream. ERPNext develop (v17) is fixing this, so we backport and
+fix as we find problems, in three places:
+
+- `resources/postgres-compat.sql`: MariaDB functions as SQL functions (`ifnull`, `if`,
+  `datediff`, `curdate`).
+- `resources/sitecustomize.py`: JSON columns as strings, no index hints (`FORCE INDEX`).
+- `apps/pegasus_compat`: functions backported from ERPNext develop, installed before every
+  request and job. So far `item_query` (the item search behind every Item field). Remove a
+  backport once the ERPNext version in `apps.json` has the fix.
+
+Works on Pegasus: install, SSO, the Profit and Loss Statement, item search, the bank import
+pages. Payroll and the ERPNextSwiss salary features are not tested yet.
 
 ## First deploy of an app
 

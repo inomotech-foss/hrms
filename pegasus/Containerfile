@@ -77,10 +77,12 @@ COPY resources/sitecustomize.py /opt/pegasus/sitecustomize.py
 RUN cp /opt/pegasus/sitecustomize.py \
     "$(env/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')/sitecustomize.py"
 
-# Signs users in from the gateway's Entra headers. It has no assets, so it
-# needs no bench build.
+# Our apps. They have no assets, so they need no bench build.
+# pegasus_auth signs users in from the gateway's Entra headers.
+# pegasus_compat backports Postgres fixes from newer ERPNext.
 COPY --chown=10001:0 apps/pegasus_auth apps/pegasus_auth
-RUN env/bin/pip install --no-cache-dir --no-deps -e apps/pegasus_auth
+COPY --chown=10001:0 apps/pegasus_compat apps/pegasus_compat
+RUN env/bin/pip install --no-cache-dir --no-deps -e apps/pegasus_auth -e apps/pegasus_compat
 
 USER 10001
 
