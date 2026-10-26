@@ -65,6 +65,10 @@ RUN chmod g=u /home/frappe/frappe-bench && \
   cp -r sites/assets assets && \
   rm -rf sites/assets
 
+# A new Kubernetes volume starts empty, unlike a Docker volume, so the init
+# container copies these files (common_site_config.json, apps.txt) onto it.
+RUN cp -r sites /opt/pegasus-sites
+
 COPY --chmod=755 resources/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY --chmod=755 resources/start.sh /usr/local/bin/start.sh
 COPY --chmod=755 resources/pegasus-init.sh /usr/local/bin/pegasus-init.sh

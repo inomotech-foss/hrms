@@ -16,6 +16,7 @@ db_name=$(cat /mnt/db/dbname)
 db_user=$(cat /mnt/db/username)
 db_password=$(cat /mnt/db/password)
 
+cp -r --update=none /opt/pegasus-sites/. sites/
 ls -1 apps > sites/apps.txt
 bench set-config -g db_type postgres
 bench set-config -g db_host "$db_host"
