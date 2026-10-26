@@ -80,7 +80,9 @@ The `Administrator` password is random and never used; sign-in is SSO.
 
    ```sh
    argocd login argocd.svc.inomo.tech --sso --grpc-web
-   argocd app create erp-sandbox \
+   # --validate=false: validating clones the large HRMS repo inside the request, which
+   # runs into the gateway timeout (504). Argo CD clones it in the background instead.
+   argocd app create erp-sandbox --validate=false \
      --project apps \
      --repo https://github.com/inomotech-foss/hrms \
      --revision pegasus-v16 \
@@ -92,7 +94,7 @@ The `Administrator` password is random and never used; sign-in is SSO.
    argocd app logs erp-sandbox --kind Deployment --name frappe --container init --follow
    ```
 
-   The first start installs all apps and takes 10 to 20 minutes.
+   The first start installs all apps and takes about 3 minutes, plus the image pull.
 
 3. Open the app. You are signed in with your Entra account (see "Login"). An HR manager runs
    the setup wizard.
