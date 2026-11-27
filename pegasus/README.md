@@ -10,7 +10,7 @@ and `Containerfile`. `.github/workflows/pegasus.yaml` builds it on every push to
 
 | App | URL | Purpose |
 |---|---|---|
-| `erp-sandbox` | https://erp-sandbox.apps.svc.inomo.tech | Test data. Follows `pegasus-v16`. Safe to wipe. |
+| `erp-sandbox` | https://erp-sandbox.inomo.app | Test data. Follows `pegasus-v16`. Safe to wipe. |
 | `hr` | https://hr.apps.svc.inomo.tech | Not set up yet. Real HR data once the sandbox has passed. |
 
 Pegasus' Argo CD only reads `github.com/inomotech/*` today. Registering the app below needs
