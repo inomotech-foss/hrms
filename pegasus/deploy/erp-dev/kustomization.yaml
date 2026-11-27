@@ -8,6 +8,7 @@ configMapGenerator:
   - PEGASUS_AUTH=pegasus-auth.json
   literals:
   - SITE_NAME=erp-dev.apps.svc.inomo.tech
+  - PUBLIC_HOST=erp-dev.inomo.app
   - FRAPPE_SITE_NAME_HEADER=erp-dev.apps.svc.inomo.tech
   - INSTALL_APPS=erpnext hrms pegasus_auth
   name: frappe

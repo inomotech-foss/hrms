@@ -1,7 +1,7 @@
 # Frappe HR on Pegasus: develop variant
 
 This is branch `pegasus-develop`: Frappe, ERPNext and HRMS from `develop` (17.0.0-dev),
-without ERPNextSwiss, as the Argo CD app `erp-dev` (https://erp-dev.apps.svc.inomo.tech).
+without ERPNextSwiss, as the Argo CD app `erp-dev` (https://erp-dev.inomo.app).
 It tests how much better Postgres works on ERPNext's development line. The supported setup
 is branch `pegasus-v16` (`erp-sandbox`).
 

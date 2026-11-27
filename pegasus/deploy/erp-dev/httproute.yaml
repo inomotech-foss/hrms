@@ -6,12 +6,12 @@ spec:
   parentRefs:
     - name: pegasus-a
       namespace: inomo-envoy-gateway
-      sectionName: https-apps
+      sectionName: https-app
     - name: pegasus-b
       namespace: inomo-envoy-gateway
-      sectionName: https-apps
+      sectionName: https-app
   hostnames:
-    - erp-dev.apps.svc.inomo.tech
+    - erp-dev.inomo.app
   rules:
     - backendRefs:
         - name: frappe

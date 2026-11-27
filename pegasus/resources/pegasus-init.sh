@@ -55,7 +55,7 @@ if ! jq -e .encryption_key "sites/$SITE_NAME/site_config.json" >/dev/null; then
     "$(env/bin/python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
 fi
 
-bench --site "$SITE_NAME" set-config host_name "https://$SITE_NAME"
+bench --site "$SITE_NAME" set-config host_name "https://${PUBLIC_HOST:-$SITE_NAME}"
 bench --site "$SITE_NAME" set-config --parse pegasus_auth "${PEGASUS_AUTH:-"{}"}"
 
 installed=$(bench --site "$SITE_NAME" list-apps --format json | jq -r --arg site "$SITE_NAME" '.[$site][]')
